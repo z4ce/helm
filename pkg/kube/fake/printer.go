@@ -17,9 +17,12 @@ limitations under the License.
 package fake
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -30,7 +33,8 @@ import (
 // PrintingKubeClient implements KubeClient, but simply prints the reader to
 // the given output.
 type PrintingKubeClient struct {
-	Out io.Writer
+	Out       io.Writer
+	LogOutput io.Writer
 }
 
 // IsReachable checks if the cluster is reachable
@@ -99,6 +103,17 @@ func (p *PrintingKubeClient) Build(_ io.Reader, _ bool) (kube.ResourceList, erro
 // WaitAndGetCompletedPodPhase implements KubeClient WaitAndGetCompletedPodPhase.
 func (p *PrintingKubeClient) WaitAndGetCompletedPodPhase(_ string, _ time.Duration) (v1.PodPhase, error) {
 	return v1.PodSucceeded, nil
+}
+
+// GetPodList implements KubeClient GetPodList.
+func (p *PrintingKubeClient) GetPodList(_ string, _ metav1.ListOptions) (*v1.PodList, error) {
+	return &v1.PodList{}, nil
+}
+
+// OutputContainerLogsForPodList implements KubeClient OutputContainerLogsForPodList.
+func (p *PrintingKubeClient) OutputContainerLogsForPodList(_ *v1.PodList, someNamespace string, _ io.Writer) error {
+	_, err := io.Copy(p.LogOutput, strings.NewReader(fmt.Sprintf("attempted to output logs for namespace: %s", someNamespace)))
+	return err
 }
 
 func bufferize(resources kube.ResourceList) io.Reader {

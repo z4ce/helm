@@ -20,6 +20,8 @@ import (
 	"io"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -76,6 +78,12 @@ type Interface interface {
 type InterfaceExt interface {
 	// WaitForDelete wait up to the given timeout for the specified resources to be deleted.
 	WaitForDelete(resources ResourceList, timeout time.Duration) error
+
+	// GetPodList list all pods that match the specified listOptions
+	GetPodList(namespace string, listOptions metav1.ListOptions) (*v1.PodList, error)
+
+	// OutputContainerLogsForPodList output the logs for a pod list
+	OutputContainerLogsForPodList(podList *v1.PodList, namespace string, writer io.Writer) error
 }
 
 var _ Interface = (*Client)(nil)
