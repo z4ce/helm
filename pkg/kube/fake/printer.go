@@ -17,6 +17,7 @@ limitations under the License.
 package fake
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -32,7 +33,8 @@ import (
 // PrintingKubeClient implements KubeClient, but simply prints the reader to
 // the given output.
 type PrintingKubeClient struct {
-	Out io.Writer
+	Out       io.Writer
+	LogOutput io.Writer
 }
 
 // IsReachable checks if the cluster is reachable
@@ -125,6 +127,17 @@ func (p *PrintingKubeClient) DeleteWithPropagationPolicy(resources kube.Resource
 		return nil, []error{err}
 	}
 	return &kube.Result{Deleted: resources}, nil
+}
+
+// GetPodList implements KubeClient GetPodList.
+func (p *PrintingKubeClient) GetPodList(_ string, _ metav1.ListOptions) (*v1.PodList, error) {
+	return &v1.PodList{}, nil
+}
+
+// OutputContainerLogsForPodList implements KubeClient OutputContainerLogsForPodList.
+func (p *PrintingKubeClient) OutputContainerLogsForPodList(_ *v1.PodList, someNamespace string, _ io.Writer) error {
+	_, err := io.Copy(p.LogOutput, strings.NewReader(fmt.Sprintf("attempted to output logs for namespace: %s", someNamespace)))
+	return err
 }
 
 func bufferize(resources kube.ResourceList) io.Reader {
