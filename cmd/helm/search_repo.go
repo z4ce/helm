@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -259,7 +258,7 @@ func compListChartsOfRepo(repoName string, prefix string) []string {
 	var charts []string
 
 	path := filepath.Join(settings.RepositoryCache, helmpath.CacheChartsFile(repoName))
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err == nil {
 		scanner := bufio.NewScanner(bytes.NewReader(content))
 		for scanner.Scan() {
@@ -312,8 +311,9 @@ func compListCharts(toComplete string, includeFiles bool) ([]string, cobra.Shell
 		}
 		repoWithSlash := fmt.Sprintf("%s/", repo)
 		if strings.HasPrefix(toComplete, repoWithSlash) {
-			// Must complete with charts within the specified repo
-			completions = append(completions, compListChartsOfRepo(repo, toComplete)...)
+			// Must complete with charts within the specified repo.
+			// Don't filter on toComplete to allow for shell fuzzy matching
+			completions = append(completions, compListChartsOfRepo(repo, "")...)
 			noSpace = false
 			break
 		} else if strings.HasPrefix(repo, toComplete) {
@@ -325,7 +325,7 @@ func compListCharts(toComplete string, includeFiles bool) ([]string, cobra.Shell
 	cobra.CompDebugln(fmt.Sprintf("Completions after repos: %v", completions), settings.Debug)
 
 	// Now handle completions for url prefixes
-	for _, url := range []string{"https://\tChart URL prefix", "http://\tChart URL prefix", "file://\tChart local URL prefix"} {
+	for _, url := range []string{"oci://\tChart OCI prefix", "https://\tChart URL prefix", "http://\tChart URL prefix", "file://\tChart local URL prefix"} {
 		if strings.HasPrefix(toComplete, url) {
 			// The user already put in the full url prefix; we don't have
 			// anything to add, but make sure the shell does not default

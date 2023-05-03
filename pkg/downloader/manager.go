@@ -20,7 +20,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -34,7 +33,6 @@ import (
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
 
-	"helm.sh/helm/v3/internal/experimental/registry"
 	"helm.sh/helm/v3/internal/resolver"
 	"helm.sh/helm/v3/internal/third_party/dep/fs"
 	"helm.sh/helm/v3/internal/urlutil"
@@ -43,6 +41,7 @@ import (
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/getter"
 	"helm.sh/helm/v3/pkg/helmpath"
+	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/repo"
 )
 
@@ -232,7 +231,7 @@ func (m *Manager) loadChartDir() (*chart.Chart, error) {
 //
 // This returns a lock file, which has all of the dependencies normalized to a specific version.
 func (m *Manager) resolve(req []*chart.Dependency, repoNames map[string]string) (*chart.Lock, error) {
-	res := resolver.New(m.ChartPath, m.RepositoryCache)
+	res := resolver.New(m.ChartPath, m.RepositoryCache, m.RegistryClient)
 	return res.Resolve(req, repoNames)
 }
 
@@ -332,6 +331,7 @@ func (m *Manager) downloadAll(deps []*chart.Dependency) error {
 			Keyring:          m.Keyring,
 			RepositoryConfig: m.RepositoryConfig,
 			RepositoryCache:  m.RepositoryCache,
+			RegistryClient:   m.RegistryClient,
 			Getters:          m.Getters,
 			Options: []getter.Option{
 				getter.WithBasicAuth(username, password),
@@ -343,11 +343,6 @@ func (m *Manager) downloadAll(deps []*chart.Dependency) error {
 
 		version := ""
 		if registry.IsOCI(churl) {
-			if !resolver.FeatureGateOCI.IsEnabled() {
-				return errors.Wrapf(resolver.FeatureGateOCI.Error(),
-					"the repository %s is an OCI registry", churl)
-			}
-
 			churl, version, err = parseOCIRef(churl)
 			if err != nil {
 				return errors.Wrapf(err, "could not parse OCI reference")
@@ -404,12 +399,12 @@ func parseOCIRef(chartRef string) (string, string, error) {
 func (m *Manager) safeMoveDeps(deps []*chart.Dependency, source, dest string) error {
 	existsInSourceDirectory := map[string]bool{}
 	isLocalDependency := map[string]bool{}
-	sourceFiles, err := ioutil.ReadDir(source)
+	sourceFiles, err := os.ReadDir(source)
 	if err != nil {
 		return err
 	}
 	// attempt to read destFiles; fail fast if we can't
-	destFiles, err := ioutil.ReadDir(dest)
+	destFiles, err := os.ReadDir(dest)
 	if err != nil {
 		return err
 	}
@@ -440,7 +435,7 @@ func (m *Manager) safeMoveDeps(deps []*chart.Dependency, source, dest string) er
 	}
 
 	fmt.Fprintln(m.Out, "Deleting outdated charts")
-	// find all files that exist in dest that do not exist in source; delete them (outdated dependendencies)
+	// find all files that exist in dest that do not exist in source; delete them (outdated dependencies)
 	for _, file := range destFiles {
 		if !file.IsDir() && !existsInSourceDirectory[file.Name()] {
 			fname := filepath.Join(dest, file.Name())
@@ -578,8 +573,7 @@ func (m *Manager) resolveRepoNames(deps []*chart.Dependency) (map[string]string,
 	missing := []string{}
 	for _, dd := range deps {
 		// Don't map the repository, we don't need to download chart from charts directory
-		// When OCI is used there is no Helm repository
-		if dd.Repository == "" || registry.IsOCI(dd.Repository) {
+		if dd.Repository == "" {
 			continue
 		}
 		// if dep chart is from local path, verify the path is valid
@@ -850,7 +844,7 @@ func writeLock(chartpath string, lock *chart.Lock, legacyLockfile bool) error {
 		lockfileName = "requirements.lock"
 	}
 	dest := filepath.Join(chartpath, lockfileName)
-	return ioutil.WriteFile(dest, data, 0644)
+	return os.WriteFile(dest, data, 0644)
 }
 
 // archive a dep chart from local directory and save it into destPath

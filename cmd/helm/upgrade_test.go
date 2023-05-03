@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -359,7 +358,7 @@ func TestUpgradeInstallWithValuesFromStdin(t *testing.T) {
 
 func prepareMockRelease(releaseName string, t *testing.T) (func(n string, v int, ch *chart.Chart) *release.Release, *chart.Chart, string) {
 	tmpChart := ensure.TempDir(t)
-	configmapData, err := ioutil.ReadFile("testdata/testcharts/upgradetest/templates/configmap.yaml")
+	configmapData, err := os.ReadFile("testdata/testcharts/upgradetest/templates/configmap.yaml")
 	if err != nil {
 		t.Fatalf("Error loading template yaml %v", err)
 	}
@@ -405,6 +404,10 @@ func TestUpgradeVersionCompletion(t *testing.T) {
 	tests := []cmdTestCase{{
 		name:   "completion for upgrade version flag",
 		cmd:    fmt.Sprintf("%s __complete upgrade releasename testing/alpine --version ''", repoSetup),
+		golden: "output/version-comp.txt",
+	}, {
+		name:   "completion for upgrade version flag, no filter",
+		cmd:    fmt.Sprintf("%s __complete upgrade releasename testing/alpine --version 0.3", repoSetup),
 		golden: "output/version-comp.txt",
 	}, {
 		name:   "completion for upgrade version flag too few args",
