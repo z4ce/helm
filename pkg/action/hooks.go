@@ -196,7 +196,8 @@ func (cfg *Configuration) outputContainerLogsForListOptions(namespace string, li
 		if err != nil {
 			return err
 		}
-		err = kubeClient.OutputContainerLogsForPodList(podList, namespace, log.Writer())
+		logWriterFunc := cfg.HookOutputFunc
+		err = kubeClient.OutputContainerLogsForPodList(podList, namespace, logWriterFunc)
 		return err
 	}
 	return nil

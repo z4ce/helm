@@ -19,6 +19,7 @@ package action
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -93,6 +94,9 @@ type Configuration struct {
 
 	// Capabilities describes the capabilities of the Kubernetes cluster.
 	Capabilities *chartutil.Capabilities
+
+	// Called with container name and returns and expects writer that will receive the log output
+	HookOutputFunc func(namespace string, pod string, container string) io.Writer
 
 	Log func(string, ...interface{})
 }
@@ -421,6 +425,11 @@ func (cfg *Configuration) Init(getter genericclioptions.RESTClientGetter, namesp
 	cfg.KubeClient = kc
 	cfg.Releases = store
 	cfg.Log = log
+
+	cfg.HookOutputFunc = func(namespace string, pod string, container string) io.Writer {
+		fmt.Fprint(os.Stdout, fmt.Sprintf("Logs for pod: %s, container: %s:\n", pod, container))
+		return os.Stdout
+	}
 
 	return nil
 }
